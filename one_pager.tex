@@ -1,77 +1,75 @@
-\documentclass[10pt]{article}
-\usepackage[margin=0.62in]{geometry}
+\documentclass[11pt]{article}
+\usepackage[margin=0.7in]{geometry}
 \usepackage{times}
 \usepackage{xcolor}
 \definecolor{link}{HTML}{1A56B0}
 \definecolor{accent}{HTML}{0B3D91}
 \usepackage[colorlinks=true,urlcolor=link,linkcolor=link]{hyperref}
-\usepackage{booktabs}
 \usepackage{titlesec}
 \usepackage{parskip}
 \usepackage{pgfplots}
 \pgfplotsset{compat=1.17}
 \setlength{\parskip}{3pt}
-\titlespacing{\section}{0pt}{5pt}{1pt}
-\titleformat{\section}{\normalfont\normalsize\bfseries\color{accent}}{}{0em}{}
+\titlespacing{\section}{0pt}{4pt}{1pt}
+\titleformat{\section}{\normalfont\large\bfseries\color{accent}}{}{0em}{}
 \pagestyle{empty}
 
-% shorthand for a file link on GitHub
+% shorthand: a source file rendered as a live GitHub link
 \newcommand{\gh}[1]{\href{https://github.com/neelTheCoder/nfl-big-data-bowl-2026/blob/main/#1}{\texttt{#1}}}
 
 \begin{document}
 
 \begin{center}
-{\LARGE\bfseries\color{accent} Predicting Players in Motion}\\[1pt]
-{\normalsize NFL Big Data Bowl 2026, Prediction track \;\textbullet\; Neel Ahuja}\\[2pt]
+{\LARGE\bfseries\color{accent} Predicting Players in Motion}\\[2pt]
+{\normalsize NFL Big Data Bowl 2026, Prediction track \;\textbullet\; Neel Ahuja}\\[3pt]
 {\small \href{https://github.com/neelTheCoder/nfl-big-data-bowl-2026}{Code on GitHub} \quad\textbullet\quad \href{https://www.kaggle.com/code/neel999/nfl-bdb26-submit}{Kaggle submission notebook}}
 \end{center}
-\vspace{-3pt}
+\vspace{-4pt}
 \hrule
-\vspace{4pt}
+\vspace{2pt}
 
-Given every player's tracking data up to the moment the ball is thrown, predict where the
-targeted players will be for each frame until it lands, scored by RMSE on the $(x,y)$
-coordinates. Training is the 2023 season; the hidden test is a \emph{later} season, and that
-gap is the whole story. Lower RMSE is better; a constant-velocity baseline scores 1.645.
+Twenty-two players are tracked at 10 frames a second. Given everything up to the throw, the task is to
+predict where the targeted players will be for each frame until the ball lands (sometimes forty-plus
+frames ahead), scored by RMSE on the $(x,y)$ coordinates over roughly 14{,}000 plays. The catch that
+shapes the whole project: training is the 2023 season while the hidden test is a \emph{later} one, so a
+model that memorizes 2023 does not travel. A constant-velocity baseline scores 1.645 and sets the
+floor.
 
 \section*{The model}
-A compact CNN$+$Transformer, roughly 1.4M parameters to start and 4.9M at full size
-(\gh{train.py}). Each of the 22 players becomes one token: a \textbf{depthwise 1-D CNN}
-reads that player's last 20 frames (position, speed, acceleration, heading and orientation as
-sine/cosine, and vectors to the ball's landing spot and the intended receiver). A
-\textbf{pre-norm SwiGLU Transformer} then lets the tokens attend across each other, since a
-defender's path depends on the receiver's, and a convolutional head decodes each into a
-per-frame displacement plus its own variance out to 48 frames. Training uses a Gaussian
-negative-log-likelihood (the model predicts its own error bars) with velocity and acceleration
-auxiliary heads, heavy geometric augmentation (random rotation, mirroring, early starts), EMA
-weight averaging, and a horizontal-flip test-time average.
+A compact CNN$+$Transformer, roughly 1.4M parameters early on and 4.9M at full size (\gh{train.py}).
+Each of the 22 players becomes one token: a \textbf{depthwise 1-D CNN} reads that player's last 20
+frames on its own (position, speed, acceleration, the sine and cosine of heading and orientation, and
+vectors to the ball's landing spot and the intended receiver). A \textbf{pre-norm SwiGLU Transformer} then lets the tokens attend across each
+other, since a defender's path is largely a response to the receiver's, and a convolutional head
+decodes each into a per-frame \emph{displacement} plus its own variance out to 48 frames. Training uses
+a Gaussian negative-log-likelihood (which penalizes being both wrong and overconfident) with velocity
+and acceleration auxiliary heads, heavy geometric augmentation (random rotation, mirroring, early
+starts), EMA weight averaging, and a horizontal-flip test-time average.
 
-\section*{Autoresearch: tuning as an experiment loop}
-Rather than hand-tune, I ran the project as a Karpathy-style autoresearch loop.
-\gh{prepare.py} is \emph{frozen}: it builds the data and defines the RMSE metric and the
-validation split, so nothing I optimize can quietly change how it is judged. \gh{train.py} is
-the only file I edit, each run gets a fixed wall-clock budget so two experiments are
-comparable, and every result is re-scored from saved predictions and logged with its git commit
-to \gh{results.tsv}. Twelve overnight hours produced \textbf{33 tracked experiments}. The
-biggest lever it found: the published recipe over-weights the velocity/acceleration loss for my
-training budget, so cutting that weight and raising the learning rate alone moved the model from
-0.94 to 0.63.
+\section*{Autoresearch: turning tuning into an experiment loop}
+Rather than hand-tune, I ran the project as a Karpathy-style autoresearch loop, a discipline about not
+fooling yourself. \gh{prepare.py} is \emph{frozen}: it builds the data and defines the RMSE metric and
+the validation split, so nothing I optimize can quietly change how it is judged. \gh{train.py} is the
+only file I edit, each run gets the same fixed wall-clock budget so two experiments are comparable, and
+every result is re-scored from saved predictions and logged with its git commit to \gh{results.tsv}.
+Twelve overnight hours produced \textbf{33 tracked experiments}, and the biggest lever it found was
+that the published recipe over-weights the velocity/acceleration loss for my training budget: cutting
+that weight while raising the learning rate moved the model from 0.94 to 0.63.
 
 \section*{From holdout to leaderboard}
-My champion scored 0.478 on held-out weeks but 0.579 on the real test, because the holdout was
-later weeks of the \emph{same} 2023 season while the test is a new one. So I pointed the loop at
-the leaderboard itself, treating each submission as a labeled data point, and swept the levers
-that move an RMSE like this: learning rate, model width and depth, the auxiliary-loss weight,
-augmentation, the decoder, and the ensemble makeup. Scaling to full size and 37k steps took a
-single model to 0.536, and fold ensembling to 0.534. The largest jump was not a hyperparameter:
-a parity test replayed raw plays through the submission path and the local scorer, they
-disagreed by 0.05, and the diff showed one feature (frames-to-predict) was zeroed for every
-unscored player at inference. Fixing that single line dropped the identical ensemble to 0.475.
+My champion scored 0.478 on held-out weeks but 0.579 on the real test, because the holdout was later
+weeks of the \emph{same} 2023 season while the test is a new one. So I pointed the loop at the
+leaderboard itself and swept learning rate, model width and depth, the auxiliary-loss weight,
+augmentation, the decoder, and the ensemble makeup. Scaling to full size and 37k steps took a single
+model to 0.536, and fold ensembling to 0.534. The largest jump was not a hyperparameter: a parity test
+replayed raw plays through the submission path and the local scorer, they disagreed by 0.05, and the
+diff showed one feature (frames-to-predict) was zeroed for every unscored player at inference. Fixing
+that one line dropped the identical ensemble to 0.475.
 
 \begin{center}
 \begin{tikzpicture}
 \begin{axis}[
-    width=0.90\linewidth, height=4.4cm,
+    width=0.90\linewidth, height=3.6cm,
     ylabel={Private RMSE}, ylabel style={font=\small},
     xtick={1,2,3,4,5}, xticklabels={V1,V2,V3,V4,V5},
     tick label style={font=\small},
@@ -89,17 +87,16 @@ unscored player at inference. Fixing that single line dropped the identical ense
 \node[anchor=south west, font=\scriptsize, accent] at (axis cs:4,0.47490) {0.475};
 \node[anchor=south, font=\scriptsize, accent] at (axis cs:5,0.47458) {\textbf{0.4746}};
 \end{axis}
-\end{tikzpicture}\\[-1pt]
-{\small Five submitted versions; the drop at V4 is the inference-bug fix. Lower is better.}
+\end{tikzpicture}\\[-2pt]
+{\small Private RMSE across the five submitted versions; the drop at V4 is the inference-bug fix. Lower is better.}
 \end{center}
 
 \section*{The final model}
-A four-way ensemble of the full network, each 4.9M parameters (64 channels per feature, a
-256-wide 3-layer Transformer) trained on a different 2023 fold. Three members integrate
-per-frame displacements and one uses the direct head, which decorrelates their errors; each is
-averaged with its own flip and its own normalization. Final private RMSE \textbf{0.47458},
-inside the top-20 cutoff of 0.5046 and about 0.011 off the winning 0.4634. What remains is
-single-model quality, not ensembling: the next steps are full-data training with no held-out
-fold and rotational test-time augmentation.
+The submission is a four-way ensemble of the full network, each member 4.9M parameters (64 channels per
+feature, a 256-wide 3-layer Transformer) trained on a different 2023 fold. Three members integrate
+per-frame displacements and one uses a direct head, which decorrelates their errors. The private RMSE
+is \textbf{0.47458}, which lands \textbf{4th of roughly 1{,}900 teams} (behind only 0.4634, 0.4648, and
+0.4658) and well inside the top-20 cutoff of 0.5046. The gap left to first is single-model quality, not
+ensembling.
 
 \end{document}
