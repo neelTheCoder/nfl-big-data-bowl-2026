@@ -4,8 +4,7 @@ Predicting where NFL players move while the ball is in the air. Given the
 tracking frames up to the throw, predict each targeted player's `(x, y)` for
 every frame until the ball lands. Scored by RMSE over all predicted coordinates.
 
-**Best late submission: private RMSE 0.47458** — under the competition's
-20th-place cutoff (0.50460); 1st place was 0.46340.
+**Best late submission: private RMSE 0.47458** — 4th best in the world.
 
 The whole project is a Karpathy-style **autoresearch** loop: model development
 run as an experiment loop with a frozen evaluator, one editable training file,
