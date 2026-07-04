@@ -1,0 +1,34 @@
+commit	budget_s	val_rmse	steps	params_M	status	description
+606b2ea	420	0.944450	1360	2.521	screen-keep	baseline v2 (1st-place clone scaled), seed 1337
+606b2ea	420	1.105579	1367	2.521	screen-keep	baseline v2, seed 2024 (noise probe)
+9e93386	420	0.949158	1330	2.521	screen-keep	exp1 SWA tail-avg, seed 1337 (raw 0.9607)
+9e93386	420	1.167547	1330	2.521	screen-keep	exp1 SWA, seed 2024 (init-luck probe)
+1e051bb	420	0.921545	1539	1.317	screen-keep	exp3 MULT=16, seed 1337 (within band, rerunning)
+1e051bb	420	0.922140	1465	1.317	screen-keep	exp3 rerun: MULT=16 confirmed (mean 0.9218 vs 0.9469)
+ceb5e41	420	0.728348	1808	1.317	screen-keep	exp4 AUX_W=0.5 (from 0.9218, huge win)
+ff20edf	420	0.687291	1849	1.317	screen-keep	exp5 AUX_W=0.2 (from 0.7283)
+a170f6f	420	0.631292	1602	1.317	screen-keep	exp8 LR=1e-3 (from 0.6515)
+57643c5	420	0.621734	1825	2.329	screen-keep	overnight baseline
+57643c5	420	0.645527	1663	2.329	screen-discard	overnight LR=0.0007
+57643c5	420	0.617582	1768	2.329	screen-discard	overnight LR=0.0015
+57643c5	420	0.619946	1462	2.329	screen-discard	overnight LR=0.002
+57643c5	420	0.704327	1019	2.412	screen-discard	overnight MULT=24
+57643c5	420	0.630916	1282	2.521	screen-discard	overnight MULT=32
+57643c5	420	0.618618	1511	2.297	screen-discard	overnight MULT=12
+57643c5	420	0.628078	1241	3.343	screen-discard	overnight DIM1=256
+b6360e1	420	0.597122	1643	1.885	screen-keep	exp12 N_LAYERS=2 ADOPT (tie + simpler/faster)
+2164162	420	0.590343	1830	1.885	screen-keep	exp13 h-flip TTA at eval (free -0.007)
+2164162	900	0.553350	3311	1.885	confirm-keep	confirm champion config @900s
+0516ee0	1800	0.515567	7753	1.885	confirm-keep	ensemble seed 1337
+0516ee0	1800	0.514818	7543	1.885	confirm-keep	ensemble seed 2024
+0516ee0	1800	0.513713	7878	1.885	confirm-keep	ensemble seed 7
+0516ee0	5400	0.512065	.	5.7	confirm-keep	ENSEMBLE 3 seeds x 1800s + hflip TTA
+cbc61dc	2400	0.508827	9307	1.736	screen-discard	r2 baseline@2400s
+cbc61dc	2400	0.587184	8819	1.736	screen-discard	r2 AUX_W=0.4
+cbc61dc	2400	0.649846	8755	1.736	screen-discard	r2 AUX_W=0.8
+cbc61dc	2400	0.504196	10842	1.736	screen-discard	r2 LR=5e-4
+cbc61dc	2400	0.512983	7892	1.928	screen-discard	r2 MULT=32
+cbc61dc	7200	0.483694	34465	1.736	confirm-keep	r2 final r2_best_f0 {"MULT": 16, "DIM1": 192, "N_LAYERS": 2, "N_HEADS": 8, "FF_DIM": 768, "LR": 0.001, "WEIGHT_DECAY": 0.0001, "EMA_DECAY": 0.9995, "T_USED": 20, "AUG_SHIFT_P": 0.675, "AUG_ROT_P": 0.5, "BATCH": 64, "AUX_W": 0.0}
+cbc61dc	7200	0.480139	24799	1.928	confirm-keep	r2 final r2_size_f1 {"MULT": 32, "DIM1": 192, "N_LAYERS": 2, "N_HEADS": 8, "FF_DIM": 768, "LR": 0.001, "WEIGHT_DECAY": 0.0001, "EMA_DECAY": 0.9995, "T_USED": 20, "AUG_SHIFT_P": 0.675, "AUG_ROT_P": 0.5, "BATCH": 64, "AUX_W": 0.0}
+cbc61dc	7200	0.486609	32774	1.736	confirm-keep	r2 final r2_aux_f2 {"MULT": 16, "DIM1": 192, "N_LAYERS": 2, "N_HEADS": 8, "FF_DIM": 768, "LR": 0.001, "WEIGHT_DECAY": 0.0001, "EMA_DECAY": 0.9995, "T_USED": 20, "AUG_SHIFT_P": 0.675, "AUG_ROT_P": 0.5, "BATCH": 64, "AUX_W": 0.4}
+cbc61dc	7200	0.478393	.	.	confirm-keep	r2 ENSEMBLE greedy subset + hflip TTA

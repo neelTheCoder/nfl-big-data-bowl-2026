@@ -1,0 +1,122 @@
+\documentclass[11pt]{article}
+\usepackage[margin=0.85in]{geometry}
+\usepackage{times}
+\usepackage[colorlinks=true,urlcolor=blue,linkcolor=blue]{hyperref}
+\usepackage{booktabs}
+\usepackage{enumitem}
+\usepackage{titlesec}
+\usepackage{parskip}
+\titlespacing{\section}{0pt}{6pt}{2pt}
+\titleformat{\section}{\normalfont\large\bfseries}{}{0em}{}
+\setlist{nosep,leftmargin=1.2em}
+\pagestyle{empty}
+
+\begin{document}
+
+\begin{center}
+{\LARGE\bfseries Predicting Players in Motion}\\[2pt]
+{\large NFL Big Data Bowl 2026 --- Prediction track}\\[4pt]
+Neel Ahuja \quad\textbullet\quad Code: \href{https://github.com/neelTheCoder/nfl-big-data-bowl-2026}{github.com/neelTheCoder/nfl-big-data-bowl-2026}
+\end{center}
+
+\vspace{-2pt}
+The problem is a forecasting one: given every player's tracking data up to the
+moment a quarterback releases the ball, predict where the targeted players will
+be for each frame until the ball lands. Submissions are scored by RMSE on those
+$(x,y)$ coordinates. Training data is the 2023 season; the hidden test set is a
+later season, which turns out to matter a lot.
+
+\section*{Starting simple}
+I began with a constant-velocity baseline --- extrapolate each player in a
+straight line at their current speed --- purely to set a floor. It scores
+1.645 RMSE, and every model after had to beat it. The first real model was a
+compact network I kept deliberately small (about 1.4M parameters) so I could
+iterate fast. Its shape didn't change much afterward; what changed was its size
+and its settings. Each of the 22 players is turned into one token: a
+\textbf{depthwise 1-D CNN} reads that player's last 20 frames --- position,
+speed, acceleration, and the sine/cosine of heading and body orientation, plus
+vectors pointing to where the ball will land and to the intended receiver. A
+small stem embeds the per-play facts (player role, ball-landing spot, how many
+frames I have to predict). A \textbf{pre-norm Transformer with SwiGLU feed-forward}
+then lets the 22 tokens attend to each other, since a defender's path depends on
+the receiver's, and a convolutional head decodes each token into a per-frame
+displacement and an uncertainty for it. I train it with a Gaussian
+negative-log-likelihood (so the model predicts its own error bars) alongside
+auxiliary heads that predict velocity and acceleration, and I lean on heavy
+geometric augmentation --- rotating the whole play a random amount, mirroring it,
+and starting the prediction a few frames early --- so it never memorizes field
+orientation. Exponential moving-average weights and a horizontal-flip
+test-time average round it out.
+
+\section*{Autoresearch: turning tuning into an experiment loop}
+Rather than hand-tune, I ran the project as an autoresearch loop in the style
+Andrej Karpathy has described. The idea is a strict separation of roles. One
+file, \texttt{prepare.py}, is \emph{frozen}: it builds the data and \emph{defines
+the RMSE metric and the validation split}, and I never touch it during a run, so
+nothing I optimize can quietly change how it's judged. A second file,
+\texttt{train.py}, is the only thing I edit --- model, features, loss,
+augmentation --- and each run gets a fixed wall-clock budget so two experiments
+are actually comparable. Every result is re-scored independently from the saved
+predictions (the loop can't grade its own homework), logged to
+\texttt{results.tsv} with its git commit, and written up in a journal with the
+hypothesis and the lesson. Because everything lives on disk, I can stop and
+resume, and I keep a change only if it beats the running best by more than the
+measured run-to-run noise.
+
+I let this run overnight, roughly twelve hours, and came out with
+\textbf{33 tracked experiments}
+(\href{https://github.com/neelTheCoder/nfl-big-data-bowl-2026/blob/master/results.tsv}{results.tsv}).
+The loop found the levers that mattered: the published recipe puts most of its
+loss weight on the velocity/acceleration heads, which is wrong at my training
+budget --- dropping that weight and raising the learning rate alone took the
+model from 0.94 to 0.63. Decoding per-frame \emph{displacements} and integrating
+them, a wider-but-shallower transformer, and the flip-averaging at test time each
+bought a bit more. The best model on my held-out weeks scored 0.478, and its
+first real submission to Kaggle came back at \textbf{0.57915}.
+
+\section*{Optimizing against the leaderboard itself}
+That gap --- 0.478 at home, 0.579 on the real test --- was the tell. My holdout
+was later weeks of the \emph{same} 2023 season the model trained on, so it was
+too easy; the hidden test is a different season. So I stopped trusting the local
+number and pointed the same loop at the leaderboard directly, treating each
+submission as a labeled data point. Across seven submitted versions I swept the
+things that actually move an RMSE like this: the learning rate, the model's
+width (channels per feature) and embedding dimension, its depth, the
+auxiliary-loss weight, the augmentation probabilities, the decoder, and the
+makeup of the ensemble. Scaling the network to its full size (about 4.9M
+parameters) and training it the full $\sim$37k steps moved a single model from
+0.579 to 0.536, and ensembling models trained on different data folds nudged it
+to 0.534. One improvement was not a hyperparameter at all: a parity test that
+replayed raw plays through my submission code and my local scorer disagreed by
+0.05, and diffing the two paths showed a single input feature --- the number of
+frames to predict --- was being zeroed for every unscored player at inference.
+Fixing that one line dropped the identical ensemble from 0.534 to \textbf{0.475}.
+
+\begin{center}
+\begin{tabular}{@{}clr@{}}
+\toprule
+\# & Change & Private RMSE \\
+\midrule
+1 & Autoresearch champion, first submission & 0.57915 \\
+2 & Scale to full config, full 37k-step training & 0.53559 \\
+3 & Three-model data-fold ensemble & 0.53405 \\
+4 & Fix zeroed frames-to-predict feature & 0.47490 \\
+5 & Add decode-diverse member \textbf{(final)} & \textbf{0.47458} \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\section*{The final model}
+The submitted model is a four-way ensemble of the full-size network: three
+members decode by integrating per-frame displacements, and one uses the direct
+displacement head, which decorrelates their mistakes. Each is $\sim$4.9M
+parameters, trained on a different fold of the 2023 data at 1st-place scale
+(64 channels per feature, a 256-wide 3-layer transformer), and at inference I
+average each member with its own horizontal-flip and its own normalization
+statistics. It scores \textbf{0.47458} on the private test --- inside the
+competition's top-20 cutoff of 0.50460, and about 0.011 off the 0.46340 that won
+it. The remaining distance is single-model quality, not ensembling, which is
+where I'd spend the next block of compute: training final models on all the data
+with no held-out fold, and adding rotational test-time augmentation.
+
+\end{document}

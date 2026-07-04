@@ -1,0 +1,22 @@
+# competitor reference code (pulled from Kaggle — not ours to redistribute)
+reference/
+
+# data, model weights, and generated artifacts
+.venv/
+data/
+models/
+run.log
+*.pt
+*.npz
+*.parquet
+best_config.json
+__pycache__/
+*.pyc
+kaggle_pkg/model_ds/
+kaggle_pkg/parity_scratch/
+kaggle_pkg/state.json
+kaggle_pkg/*.out
+
+# credentials (never commit)
+*access_token*
+kaggle.json

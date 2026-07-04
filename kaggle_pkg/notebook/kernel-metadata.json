@@ -1,0 +1,15 @@
+{
+  "id": "neel999/nfl-bdb26-submit",
+  "title": "NFL BDB26 Submit",
+  "code_file": "nfl_bdb26_submit.py",
+  "language": "python",
+  "kernel_type": "script",
+  "is_private": true,
+  "enable_gpu": false,
+  "enable_tpu": false,
+  "enable_internet": false,
+  "dataset_sources": ["neel999/nfl-bdb26-models"],
+  "competition_sources": ["nfl-big-data-bowl-2026-prediction"],
+  "kernel_sources": [],
+  "model_sources": []
+}
